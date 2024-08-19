@@ -27,12 +27,18 @@ class BetterRadioApp(QWidget):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
+        percentageOfUniqueTrackLabel = QLabel("Amount of unique songs to appear in suggested songs", self)
+        self.percentageOfUniqueTrackValueLabel = QLabel("100% new songs", self)
+        layout.addWidget(percentageOfUniqueTrackLabel)
+        layout.addWidget(self.percentageOfUniqueTrackValueLabel)
         self.radioSongNewnessSlider = QSlider(Qt.Orientation.Horizontal, self)
         self.radioSongNewnessSlider.setMinimum(0)
         self.radioSongNewnessSlider.setMaximum(100)
-        self.radioSongNewnessSlider.setValue(50)
+        self.radioSongNewnessSlider.setValue(100)
         self.radioSongNewnessSlider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.radioSongNewnessSlider.setTickInterval(1)
+        self.radioSongNewnessSlider.sliderMoved.connect(self.change_new_song_percentage_text)
+        self.radioSongNewnessSlider.valueChanged.connect(self.change_percentage_of_new_songs)
 
         numberOfRadioTrackLabel = QLabel("Amount of songs to recommend", self)
         self.numberOfRadioTracks = QLineEdit(self)
@@ -52,56 +58,85 @@ class BetterRadioApp(QWidget):
         similarToPlaylistButton.clicked.connect(self.get_similar_to_playlist_songs)
 
 
-    def add_tracks(self, fiftyTrackList, recTrackLimit, offset=0):
-        for i in range(len(fiftyTrackList)):
-            if len(self.uniqueTrackRecs) == recTrackLimit: 
-                break
-            if fiftyTrackList[i] != self.recUniqueSongs:
-                self.uniqueTrackRecs.append(self.recommendationTracksURIs[i+offset])
+    def change_new_song_percentage_text(self):
+        self.percentageOfUniqueTrackValueLabel.setText(str(self.radioSongNewnessSlider.value()) + "% new songs")
 
-    def add_collection_rec_tracks(self, trackCollectionTracks, fiftyTrackList, recTrackLimit, offset=0):
-        for i in range(len(fiftyTrackList)):
-            if len(self.uniqueTrackRecs) == recTrackLimit: 
+
+    def change_percentage_of_new_songs(self):
+        self.change_new_song_percentage_text()
+
+
+    def add_tracks(self, fiftyTrackListUniqueness, offset=0):
+        for i in range(len(fiftyTrackListUniqueness)):
+            if len(self.recommendedTracks) == self.recTrackLimit: 
                 break
-            if fiftyTrackList[i] != self.recUniqueSongs:
-                if self.recommendationTracksURIs[i+offset] not in trackCollectionTracks:
-                    self.uniqueTrackRecs.append(self.recommendationTracksURIs[i+offset])
+            elif fiftyTrackListUniqueness[i] == True and self.knownTracksToAdd > 0:
+                if self.recommendationTracksURIs[i+offset] not in self.recommendedTracks:
+                    self.recommendedTracks.append(self.recommendationTracksURIs[i+offset])
+                    self.knownTracksToAdd -= 1
+            elif fiftyTrackListUniqueness[i] == False and self.uniqueTracksToAdd > 0:
+                if self.recommendationTracksURIs[i+offset] not in self.recommendedTracks:
+                    self.recommendedTracks.append(self.recommendationTracksURIs[i+offset])
+                    self.uniqueTracksToAdd -= 1
+        
+
+    def add_collection_rec_tracks(self, trackCollectionTracks, fiftyTrackListUniqueness, offset=0):
+        for i in range(len(fiftyTrackListUniqueness)):
+            if len(self.recommendedTracks) == self.recTrackLimit: 
+                break
+            elif fiftyTrackListUniqueness[i] == True and self.knownTracksToAdd > 0:
+                if self.recommendationTracksURIs[i+offset] not in self.recommendedTracks:
+                    if self.recommendationTracksURIs[i+offset] not in trackCollectionTracks:
+                        self.recommendedTracks.append(self.recommendationTracksURIs[i+offset])
+                        self.knownTracksToAdd -= 1
+            elif fiftyTrackListUniqueness[i] == False and self.uniqueTracksToAdd > 0:
+                if self.recommendationTracksURIs[i+offset] not in self.recommendedTracks:
+                    if self.recommendationTracksURIs[i+offset] not in trackCollectionTracks:
+                        self.recommendedTracks.append(self.recommendationTracksURIs[i+offset])
+                        self.uniqueTracksToAdd -= 1
     
+
+    def update_unique_and_known_songs_to_add(self):
+        self.recTrackLimit = (int)(self.numberOfRadioTracks.text())
+        self.uniqueTracksToAdd = round(self.radioSongNewnessSlider.value()/100 * self.recTrackLimit)
+        self.knownTracksToAdd = self.recTrackLimit -  self.uniqueTracksToAdd 
+
+
     def add_generated_recs_to_queue_from_tracks(self, seed_tracks, artistURIs):
         recommendations = self.sp.recommendations(seed_artists=artistURIs, seed_tracks=seed_tracks, limit=100)["tracks"]
 
         self.recommendationTracksURIs = [track["uri"] for track in recommendations]
-        recTrackLimit = (int)(self.numberOfRadioTracks.text())
-        self.uniqueTrackRecs = []
-        self.recUniqueSongs = True
+        self.recommendedTracks = []
+        self.update_unique_and_known_songs_to_add()
 
-        first50Tracks = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[0:50])
-        self.add_tracks(first50Tracks, recTrackLimit)
+        first50TracksUniqueness = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[0:50])
+        self.add_tracks(first50TracksUniqueness)
             
-        if len(self.uniqueTrackRecs) < recTrackLimit:
-            second50Tracks = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[50:])
-            self.add_tracks(second50Tracks, recTrackLimit, 50)
+        if len(self.recommendedTracks) < self.recTrackLimit:
+            second50tracksUniqueness = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[50:])
+            self.add_tracks(second50tracksUniqueness, 50)
                 
-        for uniqueTrack in self.uniqueTrackRecs:
-            self.sp.add_to_queue(uniqueTrack)
+        for recommendedTrack in self.recommendedTracks:
+            self.sp.add_to_queue(recommendedTrack)
+        print("added " + str(len(self.recommendedTracks)) + " songs to the queue")
 
     def add_generated_recs_to_queue_from_track_collection(self, trackCollectionTracks, seed_tracks, artistURIs):
         recommendations = self.sp.recommendations(seed_artists=artistURIs, seed_tracks=seed_tracks, limit=100)["tracks"]
 
         self.recommendationTracksURIs = [track["uri"] for track in recommendations]
-        recTrackLimit = (int)(self.numberOfRadioTracks.text())
-        self.uniqueTrackRecs = []
-        self.recUniqueSongs = True
+        self.recommendedTracks = []
+        self.update_unique_and_known_songs_to_add()
 
-        first50Tracks = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[0:50])
-        self.add_collection_rec_tracks(trackCollectionTracks, first50Tracks, recTrackLimit)
+        first50TracksUniqueness = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[0:50])
+        self.add_collection_rec_tracks(trackCollectionTracks, first50TracksUniqueness)
             
-        if len(self.uniqueTrackRecs) < recTrackLimit:
-            second50Tracks = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[50:])
-            self.add_collection_rec_tracks(trackCollectionTracks, second50Tracks, recTrackLimit, 50)
+        if len(self.recommendedTracks) < self.recTrackLimit:
+            second50tracksUniqueness = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[50:])
+            self.add_collection_rec_tracks(trackCollectionTracks, second50tracksUniqueness, 50)
                 
-        for uniqueTrack in self.uniqueTrackRecs:
+        for uniqueTrack in self.recommendedTracks:
             self.sp.add_to_queue(uniqueTrack)
+        print("added " + str(len(self.recommendedTracks)) + " songs to the queue")
 
     def get_randomised_list_of_tracks_from_collection(self, playlistOrAlbum, currentlyPlayingSong):
         if playlistOrAlbum == "album": 
@@ -122,37 +157,40 @@ class BetterRadioApp(QWidget):
         return trackURIs
 
     def get_recs(self, mode):
-        if self.numberOfRadioTracks.text() == "": print("nothing")
+        if self.numberOfRadioTracks.text() == "": print("no amount of songs selected")
 
         else:
             currentlyPlayingSong = self.sp.currently_playing()
-            artists = currentlyPlayingSong["item"]["album"]["artists"]
-            artistURIs = [artist["uri"] for artist in artists]
-
             if currentlyPlayingSong != None:
+                artists = currentlyPlayingSong["item"]["album"]["artists"]
+                artistURIs = [artist["uri"] for artist in artists]
 
-                if mode == "track":
-                    currentlyPlayingSongURI = currentlyPlayingSong["item"]["uri"]
-                    self.add_generated_recs_to_queue_from_tracks([currentlyPlayingSongURI], artistURIs)
+                if currentlyPlayingSong != None:
 
-                elif mode == "album":
-                    albumTrackURIs = self.get_randomised_list_of_tracks_from_collection("album", currentlyPlayingSong)
-                    self.add_generated_recs_to_queue_from_track_collection(albumTrackURIs, albumTrackURIs[0:4], artistURIs)
+                    if mode == "track":
+                        currentlyPlayingSongURI = currentlyPlayingSong["item"]["uri"]
+                        self.add_generated_recs_to_queue_from_tracks([currentlyPlayingSongURI], artistURIs)
 
-                elif mode == "playlist":
-                    if currentlyPlayingSong["context"]["type"] == "playlist": 
-                        playlistTrackURIs = self.get_randomised_list_of_tracks_from_collection("playlist", currentlyPlayingSong)
-                        self.add_generated_recs_to_queue_from_track_collection(playlistTrackURIs, playlistTrackURIs[0:4], artistURIs)
+                    elif mode == "album":
+                        albumTrackURIs = self.get_randomised_list_of_tracks_from_collection("album", currentlyPlayingSong)
+                        self.add_generated_recs_to_queue_from_track_collection(albumTrackURIs, albumTrackURIs[0:4], artistURIs)
 
-                    else: pass
+                    elif mode == "playlist":
+                        if currentlyPlayingSong["context"]["type"] == "playlist": 
+                            playlistTrackURIs = self.get_randomised_list_of_tracks_from_collection("playlist", currentlyPlayingSong)
+                            self.add_generated_recs_to_queue_from_track_collection(playlistTrackURIs, playlistTrackURIs[0:4], artistURIs)
 
-            else: print("no song playing")
+                        else: pass
+
+                else: print("no song playing")
 
     def get_similar_to_track_songs(self):
         self.get_recs(mode="track")
 
+
     def get_similar_to_album_songs(self):
         self.get_recs(mode="album")
+
 
     def get_similar_to_playlist_songs(self):
         self.get_recs(mode="playlist")
