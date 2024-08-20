@@ -1,0 +1,35 @@
+QWidget {
+    background-color: #212121;
+    color: #ffffff;
+}
+                
+QLineEdit {
+    background-color: #ffffff;       
+    color: #212121;   
+}
+
+QLineEdit#unique-track-percentage-slider-value {
+    float: left;
+    margin: 0;
+}
+
+QLineEdit {
+    background-color: #ffffff;       
+    color: #212121;   
+}
+
+QSlider {
+    margin: 10px;
+    color: #212121;
+}        
+
+QPushButton {
+    border-radius: 15px;
+    background-color: #1fde64;
+    color: white;
+    border-style: outset;
+    border-width: 2px;
+    border-radius: 15px;
+    border-color: black;
+    padding: 4px;
+}

@@ -4,7 +4,7 @@ from spotipy.oauth2 import SpotifyOAuth
 import sys
 import random
 
-from PyQt6.QtWidgets import QApplication, QSlider, QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout
+from PyQt6.QtWidgets import QApplication, QSlider, QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QGridLayout
 from PyQt6.QtGui import QIcon, QIntValidator
 from PyQt6.QtCore import Qt
 
@@ -24,13 +24,21 @@ class BetterRadioApp(QWidget):
         self.setWindowIcon(QIcon('BetterSpotifyRadio.ico'))
         self.resize(700, 500)
 
-        layout = QVBoxLayout()
+        # layout = QVBoxLayout()
+        layout = QGridLayout()
         self.setLayout(layout)
+        
 
-        percentageOfUniqueTrackLabel = QLabel("Amount of unique songs to appear in suggested songs", self)
-        self.percentageOfUniqueTrackValueLabel = QLabel("100% new songs", self)
-        layout.addWidget(percentageOfUniqueTrackLabel)
-        layout.addWidget(self.percentageOfUniqueTrackValueLabel)
+        self.percentageOfUniqueTrackValue = QLineEdit("100", self)
+        self.percentageOfUniqueTrackValue.setObjectName("unique-track-percentage-slider-value") 
+        self.percentageOfUniqueTrackValue.textChanged.connect(self.update_unique_track_percentage_slider)
+        self.percentageOfUniqueTrackValue.setValidator(QIntValidator(1, 100, self))
+        self.percentageOfUniqueTrackValue.setFixedWidth(50)
+        self.percentageOfUniqueTrackValueLabel = QLabel("% new songs", self)
+        layout.addWidget(self.percentageOfUniqueTrackValue, 0, 0)
+        layout.addWidget(self.percentageOfUniqueTrackValueLabel, 0, 1)
+
+
         self.radioSongNewnessSlider = QSlider(Qt.Orientation.Horizontal, self)
         self.radioSongNewnessSlider.setMinimum(0)
         self.radioSongNewnessSlider.setMaximum(100)
@@ -39,34 +47,39 @@ class BetterRadioApp(QWidget):
         self.radioSongNewnessSlider.setTickInterval(1)
         self.radioSongNewnessSlider.sliderMoved.connect(self.change_new_song_percentage_text)
         self.radioSongNewnessSlider.valueChanged.connect(self.change_percentage_of_new_songs)
+        layout.addWidget(self.radioSongNewnessSlider, 1, 0)
 
-        numberOfRadioTrackLabel = QLabel("Amount of songs to recommend", self)
+        numberOfRadioTrackLabel = QLabel("Amount of songs to recommend:", self)
         self.numberOfRadioTracks = QLineEdit(self)
         self.numberOfRadioTracks.setPlaceholderText("Enter number from 1-50")
         self.numberOfRadioTracks.setValidator(QIntValidator(1, 50, self))
-        layout.addWidget(numberOfRadioTrackLabel)
-        layout.addWidget(self.numberOfRadioTracks)
+        layout.addWidget(numberOfRadioTrackLabel, 2, 0)
+        layout.addWidget(self.numberOfRadioTracks, 2, 1)
 
         similarToTrackButton = QPushButton("GET SIMILAR SONGS BASED ON TRACK PLAYING", self)
         similarToAlbumButton = QPushButton("GET SIMILAR SONGS BASED ON ALBUM OF TRACK PLAYING", self)
         similarToPlaylistButton = QPushButton("GET SIMILAR SONGS BASED ON PLAYLIST PLAYING", self)
-        layout.addWidget(similarToTrackButton)
-        layout.addWidget(similarToAlbumButton)
-        layout.addWidget(similarToPlaylistButton)
+        layout.addWidget(similarToTrackButton, 3, 0)
+        layout.addWidget(similarToAlbumButton, 3, 1)
+        layout.addWidget(similarToPlaylistButton, 3, 2)
         similarToTrackButton.clicked.connect(self.get_similar_to_track_songs)
         similarToAlbumButton.clicked.connect(self.get_similar_to_album_songs)
         similarToPlaylistButton.clicked.connect(self.get_similar_to_playlist_songs)
 
+    def update_unique_track_percentage_slider(self):
+        newValue = self.percentageOfUniqueTrackValue.text()
+        if newValue == "": newValue = 0
+        self.radioSongNewnessSlider.setValue(int(newValue))
 
     def change_new_song_percentage_text(self):
-        self.percentageOfUniqueTrackValueLabel.setText(str(self.radioSongNewnessSlider.value()) + "% new songs")
+        self.percentageOfUniqueTrackValue.setText(str(self.radioSongNewnessSlider.value()))
 
 
     def change_percentage_of_new_songs(self):
         self.change_new_song_percentage_text()
 
 
-    def add_tracks(self, fiftyTrackListUniqueness, offset=0):
+    def add_recommended_tracks(self, fiftyTrackListUniqueness, offset=0):
         for i in range(len(fiftyTrackListUniqueness)):
             if len(self.recommendedTracks) == self.recTrackLimit: 
                 break
@@ -100,6 +113,8 @@ class BetterRadioApp(QWidget):
         self.recTrackLimit = (int)(self.numberOfRadioTracks.text())
         self.uniqueTracksToAdd = round(self.radioSongNewnessSlider.value()/100 * self.recTrackLimit)
         self.knownTracksToAdd = self.recTrackLimit -  self.uniqueTracksToAdd 
+        print("want to find " + str(self.uniqueTracksToAdd)+ " unique tracks")
+        print("want to find " + str(self.knownTracksToAdd)+ " known tracks")
 
 
     def add_generated_recs_to_queue_from_tracks(self, seed_tracks, artistURIs):
@@ -110,14 +125,17 @@ class BetterRadioApp(QWidget):
         self.update_unique_and_known_songs_to_add()
 
         first50TracksUniqueness = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[0:50])
-        self.add_tracks(first50TracksUniqueness)
+        self.add_recommended_tracks(first50TracksUniqueness)
             
         if len(self.recommendedTracks) < self.recTrackLimit:
             second50tracksUniqueness = self.sp.current_user_saved_tracks_contains(self.recommendationTracksURIs[50:])
-            self.add_tracks(second50tracksUniqueness, 50)
+            self.add_recommended_tracks(second50tracksUniqueness, 50)
                 
         for recommendedTrack in self.recommendedTracks:
             self.sp.add_to_queue(recommendedTrack)
+
+        print(str(self.uniqueTracksToAdd)+ " unique tracks left to find")
+        print(str(self.knownTracksToAdd)+ " known tracks left to find")
         print("added " + str(len(self.recommendedTracks)) + " songs to the queue")
 
     def add_generated_recs_to_queue_from_track_collection(self, trackCollectionTracks, seed_tracks, artistURIs):
@@ -195,7 +213,12 @@ class BetterRadioApp(QWidget):
     def get_similar_to_playlist_songs(self):
         self.get_recs(mode="playlist")
 
+    
+
 app = QApplication(sys.argv)
+
+with open("styles.css", "r") as f: 
+    app.setStyleSheet(f.read())
 window = BetterRadioApp()
 window.show()
 sys.exit(app.exec())
