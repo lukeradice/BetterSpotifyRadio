@@ -1,10 +1,9 @@
 import spotipy
-import json
 from spotipy.oauth2 import SpotifyOAuth
 import sys
 import random
 
-from PyQt6.QtWidgets import QApplication, QSlider, QLabel, QWidget, QLineEdit, QPushButton, QVBoxLayout, QGridLayout
+from PyQt6.QtWidgets import QApplication, QSlider, QLabel, QWidget, QLineEdit, QPushButton, QGridLayout, QFormLayout
 from PyQt6.QtGui import QIcon, QIntValidator
 from PyQt6.QtCore import Qt
 
@@ -22,21 +21,29 @@ class BetterRadioApp(QWidget):
 
         self.setWindowTitle("BetterSpotifyRadio")
         self.setWindowIcon(QIcon('BetterSpotifyRadio.ico'))
-        self.resize(700, 500)
+        self.resize(700, 300)
 
-        # layout = QVBoxLayout()
-        layout = QGridLayout()
-        self.setLayout(layout)
+        self.layout = QGridLayout()
+        self.layout.setSpacing(10)
+        self.setLayout(self.layout)
+
+        appTitle = QLabel("Select Spotify Recommendation Filters", self)
+        appTitle.setObjectName("main-heading") 
+        self.layout.addWidget(appTitle, 0, 0, 1, 2)
         
 
         self.percentageOfUniqueTrackValue = QLineEdit("100", self)
         self.percentageOfUniqueTrackValue.setObjectName("unique-track-percentage-slider-value") 
         self.percentageOfUniqueTrackValue.textChanged.connect(self.update_unique_track_percentage_slider)
         self.percentageOfUniqueTrackValue.setValidator(QIntValidator(1, 100, self))
-        self.percentageOfUniqueTrackValue.setFixedWidth(50)
+        self.percentageOfUniqueTrackValue.setFixedWidth(40)
+
+    
         self.percentageOfUniqueTrackValueLabel = QLabel("% new songs", self)
-        layout.addWidget(self.percentageOfUniqueTrackValue, 0, 0)
-        layout.addWidget(self.percentageOfUniqueTrackValueLabel, 0, 1)
+        uniqueSongPercentageInputBox = QFormLayout()
+        uniqueSongPercentageInputBox.setSpacing(2)
+        uniqueSongPercentageInputBox.addRow(self.percentageOfUniqueTrackValue, self.percentageOfUniqueTrackValueLabel)
+        self.layout.addLayout(uniqueSongPercentageInputBox, 1, 0)
 
 
         self.radioSongNewnessSlider = QSlider(Qt.Orientation.Horizontal, self)
@@ -47,21 +54,29 @@ class BetterRadioApp(QWidget):
         self.radioSongNewnessSlider.setTickInterval(1)
         self.radioSongNewnessSlider.sliderMoved.connect(self.change_new_song_percentage_text)
         self.radioSongNewnessSlider.valueChanged.connect(self.change_percentage_of_new_songs)
-        layout.addWidget(self.radioSongNewnessSlider, 1, 0)
+        self.layout.addWidget(self.radioSongNewnessSlider, 2, 0, 1, 2)
 
         numberOfRadioTrackLabel = QLabel("Amount of songs to recommend:", self)
         self.numberOfRadioTracks = QLineEdit(self)
-        self.numberOfRadioTracks.setPlaceholderText("Enter number from 1-50")
+        self.numberOfRadioTracks.setPlaceholderText("Between 1-50")
         self.numberOfRadioTracks.setValidator(QIntValidator(1, 50, self))
-        layout.addWidget(numberOfRadioTrackLabel, 2, 0)
-        layout.addWidget(self.numberOfRadioTracks, 2, 1)
+        self.numberOfRadioTracks.setFixedWidth(100)
+        amountOfRadioSongsInputBox = QFormLayout()
+        amountOfRadioSongsInputBox.setSpacing(2)
+        amountOfRadioSongsInputBox.addRow(numberOfRadioTrackLabel, self.numberOfRadioTracks)
+        self.layout.addLayout(amountOfRadioSongsInputBox, 3, 0)
+
 
         similarToTrackButton = QPushButton("GET SIMILAR SONGS BASED ON TRACK PLAYING", self)
+        similarToTrackButton.setCursor(Qt.CursorShape.PointingHandCursor)
         similarToAlbumButton = QPushButton("GET SIMILAR SONGS BASED ON ALBUM OF TRACK PLAYING", self)
+        similarToAlbumButton.setCursor(Qt.CursorShape.PointingHandCursor)
         similarToPlaylistButton = QPushButton("GET SIMILAR SONGS BASED ON PLAYLIST PLAYING", self)
-        layout.addWidget(similarToTrackButton, 3, 0)
-        layout.addWidget(similarToAlbumButton, 3, 1)
-        layout.addWidget(similarToPlaylistButton, 3, 2)
+        similarToPlaylistButton.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self.layout.addWidget(similarToTrackButton, 4, 0)
+        self.layout.addWidget(similarToAlbumButton, 4, 1)
+        self.layout.addWidget(similarToPlaylistButton, 4, 2)
         similarToTrackButton.clicked.connect(self.get_similar_to_track_songs)
         similarToAlbumButton.clicked.connect(self.get_similar_to_album_songs)
         similarToPlaylistButton.clicked.connect(self.get_similar_to_playlist_songs)

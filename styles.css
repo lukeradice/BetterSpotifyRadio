@@ -1,3 +1,12 @@
+QLabel#main-heading {
+    font-size: 20pt;
+    font-weight: 800;
+}
+
+QLabel {
+    font-weight: 700;
+}
+
 QWidget {
     background-color: #212121;
     color: #ffffff;
@@ -24,12 +33,11 @@ QSlider {
 }        
 
 QPushButton {
-    border-radius: 15px;
     background-color: #1fde64;
-    color: white;
-    border-style: outset;
+    color: black;
+    font-weight: 800;
     border-width: 2px;
-    border-radius: 15px;
-    border-color: black;
+    border-radius: 6px;
     padding: 4px;
+    border-color: #1fde64;
 }
